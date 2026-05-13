@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Secant → Tangent · Calculus Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#08090f;
+  --surface:#0f1117;
+  --surface2:#161822;
+  --border:#252837;
+  --text:#e8eaf0;
+  --muted:#6b7080;
+  --blue:#4b9eff;
+  --blue-dim:#1a2d4a;
+  --orange:#ff7c3a;
+  --orange-dim:#3a1e0e;
+  --green:#2dd4a0;
+  --green-dim:#0d2d22;
+  --yellow:#f0c040;
+  --yellow-dim:#2e2410;
+  --purple:#a78bfa;
+  --red:#f87171;
+}
+
+html,body{height:100%;font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+
+.app{display:grid;grid-template-columns:1fr 320px;height:100vh}
+
+/* ── Canvas side ── */
+.canvas-side{position:relative;display:flex;flex-direction:column}
+
+header{padding:18px 24px 0;display:flex;align-items:baseline;gap:12px}
+header h1{font-size:22px;font-weight:800;letter-spacing:-0.5px;color:var(--text)}
+header h1 span{color:var(--blue)}
+header .sub{font-size:13px;color:var(--muted);font-weight:400}
+
+#canvas-wrap{flex:1;position:relative;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+
+/* draggable handle hint */
+.drag-hint{
+  position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+  font-size:11px;color:var(--muted);letter-spacing:.5px;
+  pointer-events:none;
+}
+
+/* formula bar */
+.formula-bar{
+  padding:10px 24px;
+  display:flex;gap:16px;align-items:center;flex-wrap:wrap;
+  border-top:1px solid var(--border);
+  background:var(--surface);
+  font-family:'JetBrains Mono',monospace;font-size:13px;
+}
+.fml{display:flex;align-items:center;gap:8px}
+.fml-label{color:var(--muted);font-size:11px;font-family:'Syne',sans-serif;letter-spacing:.5px}
+.fml-val{color:var(--text);font-weight:600}
+.sep{width:1px;height:20px;background:var(--border)}
+
+/* ── Right panel ── */
+.panel{
+  background:var(--surface);
+  border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;
+}
+
+.panel-header{
+  padding:20px 20px 12px;
+  border-bottom:1px solid var(--border);
+  font-size:11px;letter-spacing:1.5px;color:var(--muted);font-weight:700;
+}
+
+.section{padding:16px 20px;border-bottom:1px solid var(--border)}
+
+.section-title{font-size:11px;letter-spacing:1px;color:var(--muted);margin-bottom:12px;font-weight:700}
+
+/* stat cards */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:0}
+.stat{
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:10px 12px;
+}
+.stat-label{font-size:10px;color:var(--muted);letter-spacing:.5px;margin-bottom:4px}
+.stat-val{font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.stat-sub{font-size:10px;color:var(--muted);margin-top:2px}
+
+.blue{color:var(--blue)}
+.orange{color:var(--orange)}
+.green{color:var(--green)}
+.yellow{color:var(--yellow)}
+.purple{color:var(--purple)}
+
+/* sliders */
+.slider-group{margin-bottom:14px}
+.slider-row{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.slider-name{font-size:12px;color:var(--muted);width:28px;font-family:'JetBrains Mono',monospace}
+.slider-val{font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace;min-width:44px;text-align:right}
+
+input[type=range]{
+  flex:1;-webkit-appearance:none;appearance:none;
+  height:4px;border-radius:2px;background:var(--border);outline:none;cursor:pointer;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+  border:2px solid var(--bg);cursor:pointer;
+}
+input[type=range].blue-range::-webkit-slider-thumb{background:var(--blue)}
+input[type=range].orange-range::-webkit-slider-thumb{background:var(--orange)}
+input[type=range].green-range::-webkit-slider-thumb{background:var(--green)}
+input[type=range]::-webkit-slider-runnable-track{border-radius:2px}
+
+/* function picker */
+.fn-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.fn-btn{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;padding:7px 8px;font-size:12px;
+  font-family:'JetBrains Mono',monospace;color:var(--muted);
+  cursor:pointer;text-align:center;transition:all .15s;
+}
+.fn-btn:hover{border-color:var(--blue);color:var(--text)}
+.fn-btn.active{background:var(--blue-dim);border-color:var(--blue);color:var(--blue)}
+
+/* limit badge */
+.limit-badge{
+  display:flex;align-items:center;gap:10px;
+  background:var(--green-dim);border:1px solid var(--green);
+  border-radius:8px;padding:10px 14px;margin-top:10px;
+}
+.limit-icon{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0}
+.limit-text{font-size:12px;color:var(--green);font-family:'JetBrains Mono',monospace;line-height:1.5}
+
+/* legend */
+.legend{display:flex;flex-direction:column;gap:8px}
+.leg{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.leg-line{width:24px;height:3px;border-radius:2px;flex-shrink:0}
+.leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* animate button */
+.anim-btn{
+  width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);
+  background:var(--surface2);color:var(--text);font-family:'Syne',sans-serif;
+  font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.5px;
+  transition:all .15s;margin-top:8px;
+}
+.anim-btn:hover{background:var(--blue-dim);border-color:var(--blue);color:var(--blue)}
+.anim-btn.running{background:var(--orange-dim);border-color:var(--orange);color:var(--orange)}
+
+.footnote{padding:12px 20px;font-size:11px;color:var(--muted);line-height:1.6;border-top:1px solid var(--border)}
+
+/* scrollbar */
+.panel::-webkit-scrollbar{width:4px}
+.panel::-webkit-scrollbar-track{background:transparent}
+.panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- LEFT: Canvas -->
+  <div class="canvas-side">
+    <header>
+      <h1>Secant <span>→</span> Tangent</h1>
+      <span class="sub">drag P · adjust Δt &amp; Δx independently</span>
+    </header>
+
+    <div id="canvas-wrap">
+      <canvas id="c"></canvas>
+      <div class="drag-hint">drag point P along the curve</div>
+    </div>
+
+    <div class="formula-bar">
+      <div class="fml">
+        <span class="fml-label">SECANT</span>
+        <span class="fml-val" id="fb-sec">Δx/Δt = —</span>
+      </div>
+      <div class="sep"></div>
+      <div class="fml">
+        <span class="fml-label">TANGENT</span>
+        <span class="fml-val" id="fb-tan">f′(t₀) = —</span>
+      </div>
+      <div class="sep"></div>
+      <div class="fml">
+        <span class="fml-label">ERROR</span>
+        <span class="fml-val" id="fb-err">|sec−tan| = —</span>
+      </div>
+      <div class="sep"></div>
+      <div class="fml">
+        <span class="fml-label">FUNCTION</span>
+        <span class="fml-val" id="fb-fn">x(t) = t²</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Panel -->
+  <div class="panel">
+    <div class="panel-header">CONTROLS</div>
+
+    <!-- Point info -->
+    <div class="section">
+      <div class="section-title">POINTS</div>
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="stat-label">P (fixed)</div>
+          <div class="stat-val blue" id="pt-p">—</div>
+          <div class="stat-sub">drag on canvas</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Q (sliding)</div>
+          <div class="stat-val yellow" id="pt-q">—</div>
+          <div class="stat-sub">moves with Δt</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Δt Δx sliders -->
+    <div class="section">
+      <div class="section-title">INTERVALS</div>
+      <div class="slider-group">
+        <div class="slider-row">
+          <span class="slider-name orange">Δt</span>
+          <input type="range" class="orange-range" id="dt-sl" min="0.05" max="4" step="0.05" value="2"/>
+          <span class="slider-val orange" id="dt-val">2.00</span>
+        </div>
+        <div class="slider-row">
+          <span class="slider-name" style="color:var(--muted);font-size:10px">lock</span>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:var(--muted)">
+            <input type="checkbox" id="link-cb" style="accent-color:var(--blue)"/> link Δx to Δt
+          </label>
+        </div>
+        <div class="slider-row" id="dx-row">
+          <span class="slider-name green">Δx</span>
+          <input type="range" class="green-range" id="dx-sl" min="-8" max="8" step="0.1" value="4"/>
+          <span class="slider-val green" id="dx-val">4.00</span>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="stat-label">Avg velocity</div>
+          <div class="stat-val orange" id="avg-v">—</div>
+          <div class="stat-sub">Δx / Δt</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Inst. velocity</div>
+          <div class="stat-val green" id="inst-v">—</div>
+          <div class="stat-sub">f′(t₀)</div>
+        </div>
+      </div>
+
+      <div class="limit-badge" id="limit-badge" style="display:none">
+        <div class="limit-icon"></div>
+        <div class="limit-text">Δt → 0 · secant ≈ tangent<br>limit reached within 0.1</div>
+      </div>
+    </div>
+
+    <!-- t₀ slider -->
+    <div class="section">
+      <div class="section-title">ANCHOR POINT t₀</div>
+      <div class="slider-row">
+        <span class="slider-name blue">t₀</span>
+        <input type="range" class="blue-range" id="t0-sl" min="0.2" max="4.8" step="0.05" value="2"/>
+        <span class="slider-val blue" id="t0-val">2.00</span>
+      </div>
+    </div>
+
+    <!-- Function picker -->
+    <div class="section">
+      <div class="section-title">FUNCTION</div>
+      <div class="fn-grid">
+        <button class="fn-btn active" data-fn="0">t²</button>
+        <button class="fn-btn" data-fn="1">t³</button>
+        <button class="fn-btn" data-fn="2">sin(t)</button>
+        <button class="fn-btn" data-fn="3">eᵗ</button>
+        <button class="fn-btn" data-fn="4">√t</button>
+        <button class="fn-btn" data-fn="5">ln(t)</button>
+      </div>
+      <button class="anim-btn" id="anim-btn">▶  animate Δt → 0</button>
+    </div>
+
+    <!-- Legend -->
+    <div class="section">
+      <div class="section-title">LEGEND</div>
+      <div class="legend">
+        <div class="leg"><div class="leg-line" style="background:var(--blue)"></div>Curve x(t)</div>
+        <div class="leg"><div class="leg-line" style="background:var(--orange)"></div>Secant line (avg velocity)</div>
+        <div class="leg"><div class="leg-line" style="background:var(--green)"></div>Tangent line (inst. velocity)</div>
+        <div class="leg"><div class="leg-dot" style="background:var(--blue)"></div>Point P — anchor (drag me)</div>
+        <div class="leg"><div class="leg-dot" style="background:var(--yellow)"></div>Point Q — slides with Δt</div>
+        <div class="leg"><div class="leg-line" style="background:var(--muted);opacity:.5"></div>Δt &amp; Δx guide lines</div>
+      </div>
+    </div>
+
+    <div class="footnote">
+      As Δt → 0, the secant slope converges to the derivative f′(t₀). Drag P to explore any point on the curve. Δx can be set independently to see how the slope is defined geometrically.
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+const fns = [
+  {label:'t²',     expr:t=>t*t,          deriv:t=>2*t,      name:'x(t) = t²'},
+  {label:'t³',     expr:t=>t*t*t,        deriv:t=>3*t*t,    name:'x(t) = t³'},
+  {label:'sin(t)', expr:t=>Math.sin(t),  deriv:t=>Math.cos(t), name:'x(t) = sin(t)'},
+  {label:'eᵗ',    expr:t=>Math.exp(t),  deriv:t=>Math.exp(t), name:'x(t) = eᵗ'},
+  {label:'√t',    expr:t=>t<=0?0:Math.sqrt(t), deriv:t=>t<=0?0:1/(2*Math.sqrt(t)), name:'x(t) = √t'},
+  {label:'ln(t)', expr:t=>t<=0?-5:Math.log(t), deriv:t=>t<=0?0:1/t, name:'x(t) = ln(t)'},
+];
+
+let fnIdx = 0;
+let t0 = 2, dt = 2, dxOverride = null, linked = false;
+let animRunning = false, animDir = -1, animRaf = null;
+let dragging = false;
+
+const M = {top:48, right:32, bottom:52, left:64};
+
+function f(t){ return fns[fnIdx].expr(t) }
+function fp(t){ return fns[fnIdx].deriv(t) }
+
+function autoRange(){
+  const pts=[];
+  for(let t=0.1;t<=5.5;t+=0.1){ const v=f(t); if(isFinite(v)&&Math.abs(v)<200) pts.push(v); }
+  const mn=Math.min(...pts), mx=Math.max(...pts);
+  const pad=(mx-mn)*0.15||1;
+  return {tMin:0, tMax:5.5, xMin:mn-pad, xMax:mx+pad};
+}
+
+function toScreen(t,x,rng){
+  const W=canvas.width, H=canvas.height;
+  const sx=M.left+(t-rng.tMin)/(rng.tMax-rng.tMin)*(W-M.left-M.right);
+  const sy=H-M.bottom-(x-rng.xMin)/(rng.xMax-rng.xMin)*(H-M.top-M.bottom);
+  return {x:sx,y:sy};
+}
+
+function fromScreenT(sx,rng){
+  const W=canvas.width;
+  return rng.tMin+(sx-M.left)/(W-M.left-M.right)*(rng.tMax-rng.tMin);
+}
+
+function drawGrid(rng){
+  const W=canvas.width,H=canvas.height;
+  ctx.strokeStyle='#1a1c27';ctx.lineWidth=1;
+
+  const tStep=tNiceStep(rng.tMax-rng.tMin,6);
+  for(let t=Math.ceil(rng.tMin/tStep)*tStep;t<=rng.tMax;t+=tStep){
+    const p=toScreen(t,0,rng);
+    ctx.beginPath();ctx.moveTo(p.x,M.top);ctx.lineTo(p.x,H-M.bottom);ctx.stroke();
+  }
+  const xStep=tNiceStep(rng.xMax-rng.xMin,6);
+  for(let x=Math.ceil(rng.xMin/xStep)*xStep;x<=rng.xMax;x+=xStep){
+    const p=toScreen(0,x,rng);
+    ctx.beginPath();ctx.moveTo(M.left,p.y);ctx.lineTo(W-M.right,p.y);ctx.stroke();
+  }
+}
+
+function tNiceStep(range,n){
+  const raw=range/n;
+  const mag=Math.pow(10,Math.floor(Math.log10(raw)));
+  const steps=[1,2,2.5,5,10];
+  for(const s of steps) if(s*mag>=raw) return s*mag;
+  return raw;
+}
+
+function drawAxes(rng){
+  const W=canvas.width,H=canvas.height;
+  ctx.strokeStyle='#3a3d52';ctx.lineWidth=1.5;
+
+  const ox=toScreen(0,0,rng),ex=toScreen(rng.tMax,0,rng),ey=toScreen(0,rng.xMax,rng);
+  const clampY=Math.min(H-M.bottom,Math.max(M.top,ox.y));
+
+  ctx.beginPath();ctx.moveTo(M.left,clampY);ctx.lineTo(W-M.right,clampY);ctx.stroke();
+  const ox2=toScreen(rng.tMin,0,rng);
+  const clampX=Math.min(W-M.right,Math.max(M.left,ox2.x));
+  ctx.beginPath();ctx.moveTo(clampX,M.top);ctx.lineTo(clampX,H-M.bottom);ctx.stroke();
+
+  ctx.fillStyle='#6b7080';ctx.font='11px JetBrains Mono,monospace';
+  const tStep=tNiceStep(rng.tMax-rng.tMin,6);
+  for(let t=Math.ceil(rng.tMin/tStep)*tStep;t<=rng.tMax;t+=tStep){
+    const p=toScreen(t,0,rng);
+    const label=Number(t.toFixed(2)).toString();
+    ctx.fillText(label,p.x-ctx.measureText(label).width/2,H-M.bottom+15);
+  }
+  const xStep=tNiceStep(rng.xMax-rng.xMin,6);
+  for(let x=Math.ceil(rng.xMin/xStep)*xStep;x<=rng.xMax;x+=xStep){
+    const p=toScreen(0,x,rng);
+    const label=Number(x.toFixed(1)).toString();
+    ctx.fillText(label,M.left-ctx.measureText(label).width-6,p.y+4);
+  }
+
+  ctx.fillStyle='#8b8fa8';ctx.font='12px Syne,sans-serif';
+  ctx.fillText('t',W-M.right+10,clampY+4);
+  ctx.fillText('x(t)',clampX-4,M.top-10);
+}
+
+function drawCurve(rng){
+  ctx.strokeStyle='#4b9eff';ctx.lineWidth=3;
+  ctx.beginPath();let first=true;
+  for(let t=rng.tMin+0.01;t<=rng.tMax;t+=0.02){
+    const v=f(t);if(!isFinite(v)||Math.abs(v)>1e6) continue;
+    const p=toScreen(t,v,rng);
+    if(first){ctx.moveTo(p.x,p.y);first=false;}else ctx.lineTo(p.x,p.y);
+  }
+  ctx.stroke();
+}
+
+function extendLine(m,px,py,rng,color,lw=2.5,dash=[]){
+  const t1=rng.tMin,t2=rng.tMax;
+  const y1=m*(t1-px)+py, y2=m*(t2-px)+py;
+  const p1=toScreen(t1,y1,rng),p2=toScreen(t2,y2,rng);
+  ctx.save();
+  ctx.strokeStyle=color;ctx.lineWidth=lw;ctx.setLineDash(dash);
+  ctx.beginPath();ctx.moveTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.stroke();
+  ctx.restore();
+}
+
+function dot(p,color,r=7,ring='#08090f'){
+  ctx.fillStyle=color;ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle=ring;ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.stroke();
+}
+
+function label(text,p,dx,dy,color){
+  ctx.fillStyle=color;ctx.font='500 12px Syne,sans-serif';
+  ctx.fillText(text,p.x+dx,p.y+dy);
+}
+
+function render(){
+  const W=canvas.clientWidth,H=canvas.clientHeight;
+  if(canvas.width!==W||canvas.height!==H){canvas.width=W;canvas.height=H;}
+  ctx.clearRect(0,0,W,H);
+
+  const rng=autoRange();
+  const qX=t0+dt, qY=linked ? f(t0)+fp(t0)*dt : (dxOverride!==null ? f(t0)+dxOverride : f(qX));
+  const pY=f(t0);
+
+  drawGrid(rng);
+  drawAxes(rng);
+  drawCurve(rng);
+
+  const secSlope=(qY-pY)/dt;
+  const tanSlope=fp(t0);
+
+  extendLine(tanSlope,t0,pY,rng,'#2dd4a0',2.5);
+  extendLine(secSlope,t0,pY,rng,'#ff7c3a',2.5);
+
+  const pS=toScreen(t0,pY,rng), qS=toScreen(qX,qY,rng);
+
+  ctx.save();
+  ctx.strokeStyle='#555';ctx.lineWidth=1.5;ctx.setLineDash([6,5]);
+  ctx.beginPath();ctx.moveTo(qS.x,qS.y);ctx.lineTo(qS.x,pS.y);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(pS.x,pS.y);ctx.lineTo(qS.x,pS.y);ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  ctx.fillStyle='#888';ctx.font='11px JetBrains Mono,monospace';
+  const midT=toScreen((t0+qX)/2,pY,rng);
+  const midX=toScreen(qX,(pY+qY)/2,rng);
+  ctx.fillText('Δt',midT.x-6,midT.y+14);
+  ctx.fillText('Δx',midX.x+4,midX.y+4);
+  ctx.restore();
+
+  dot(pS,'#4b9eff');
+  dot(qS,'#f0c040');
+
+  label('P(t₀)',pS,-10,-14,'#6bb3ff');
+  label('Q(t₀+Δt)',qS,10,-12,'#e0b020');
+
+  const err=Math.abs(secSlope-tanSlope);
+  document.getElementById('fb-sec').textContent=`Δx/Δt = ${secSlope.toFixed(4)}`;
+  document.getElementById('fb-tan').textContent=`f′(t₀) = ${tanSlope.toFixed(4)}`;
+  document.getElementById('fb-err').textContent=`|sec−tan| = ${err.toFixed(4)}`;
+  document.getElementById('fb-fn').textContent=fns[fnIdx].name;
+
+  document.getElementById('pt-p').textContent=`(${t0.toFixed(2)}, ${pY.toFixed(2)})`;
+  document.getElementById('pt-q').textContent=`(${qX.toFixed(2)}, ${qY.toFixed(2)})`;
+  document.getElementById('avg-v').textContent=secSlope.toFixed(4);
+  document.getElementById('inst-v').textContent=tanSlope.toFixed(4);
+
+  document.getElementById('limit-badge').style.display=Math.abs(dt)<0.12?'flex':'none';
+}
+
+function syncSliders(){
+  document.getElementById('t0-val').textContent=t0.toFixed(2);
+  document.getElementById('t0-sl').value=t0;
+  document.getElementById('dt-val').textContent=dt.toFixed(2);
+  document.getElementById('dt-sl').value=dt;
+
+  if(linked){
+    dxOverride=null;
+    const computed=fp(t0)*dt;
+    document.getElementById('dx-val').textContent=computed.toFixed(2);
+    document.getElementById('dx-sl').value=computed;
+  } else {
+    const dxVal=dxOverride!==null?dxOverride:parseFloat(document.getElementById('dx-sl').value);
+    document.getElementById('dx-val').textContent=dxVal.toFixed(2);
+  }
+}
+
+document.getElementById('dt-sl').addEventListener('input',e=>{
+  dt=parseFloat(e.target.value);
+  if(linked) dxOverride=null;
+  syncSliders();render();
+});
+
+document.getElementById('dx-sl').addEventListener('input',e=>{
+  if(linked) return;
+  dxOverride=parseFloat(e.target.value);
+  syncSliders();render();
+});
+
+document.getElementById('t0-sl').addEventListener('input',e=>{
+  t0=parseFloat(e.target.value);
+  syncSliders();render();
+});
+
+document.getElementById('link-cb').addEventListener('change',e=>{
+  linked=e.target.checked;
+  document.getElementById('dx-row').style.opacity=linked?'0.4':'1';
+  document.getElementById('dx-sl').disabled=linked;
+  dxOverride=null;
+  syncSliders();render();
+});
+
+document.querySelectorAll('.fn-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.fn-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    fnIdx=parseInt(btn.dataset.fn);
+    if(fnIdx===4||fnIdx===5) t0=Math.max(0.3,t0);
+    syncSliders();render();
+  });
+});
+
+const animBtn=document.getElementById('anim-btn');
+animBtn.addEventListener('click',()=>{
+  if(animRunning){
+    animRunning=false;animBtn.classList.remove('running');animBtn.textContent='▶  animate Δt → 0';
+    cancelAnimationFrame(animRaf);return;
+  }
+  animRunning=true;animBtn.classList.add('running');animBtn.textContent='■  stop animation';
+  animDir=-1;
+  function step(){
+    if(!animRunning) return;
+    dt=Math.max(0.05,Math.min(4,dt+animDir*0.025));
+    if(dt<=0.05) animDir=1;
+    if(dt>=4) animDir=-1;
+    syncSliders();render();
+    animRaf=requestAnimationFrame(step);
+  }
+  step();
+});
+
+// Drag P on canvas
+const wrap=document.getElementById('canvas-wrap');
+wrap.addEventListener('mousedown',e=>{
+  const rect=canvas.getBoundingClientRect();
+  const sx=e.clientX-rect.left;
+  const rng=autoRange();
+  const hit=toScreen(t0,f(t0),rng);
+  if(Math.hypot(sx-hit.x,(e.clientY-rect.top)-hit.y)<18){
+    dragging=true;e.preventDefault();
+  }
+});
+wrap.addEventListener('mousemove',e=>{
+  if(!dragging) return;
+  const rect=canvas.getBoundingClientRect();
+  const sx=e.clientX-rect.left;
+  const rng=autoRange();
+  let nt=fromScreenT(sx,rng);
+  nt=Math.max(rng.tMin+0.1,Math.min(rng.tMax-0.1,nt));
+  if(fnIdx===4||fnIdx===5) nt=Math.max(0.2,nt);
+  t0=parseFloat(nt.toFixed(2));
+  syncSliders();render();
+});
+wrap.addEventListener('mouseup',()=>dragging=false);
+wrap.addEventListener('mouseleave',()=>dragging=false);
+
+wrap.addEventListener('touchstart',e=>{
+  const rect=canvas.getBoundingClientRect();
+  const touch=e.touches[0];
+  const sx=touch.clientX-rect.left;
+  const rng=autoRange();
+  const hit=toScreen(t0,f(t0),rng);
+  if(Math.hypot(sx-hit.x,(touch.clientY-rect.top)-hit.y)<24){
+    dragging=true;e.preventDefault();
+  }},{passive:false});
+wrap.addEventListener('touchmove',e=>{
+  if(!dragging) return;
+  const rect=canvas.getBoundingClientRect();
+  const touch=e.touches[0];
+  const sx=touch.clientX-rect.left;
+  const rng=autoRange();
+  let nt=fromScreenT(sx,rng);
+  nt=Math.max(rng.tMin+0.1,Math.min(rng.tMax-0.1,nt));
+  t0=parseFloat(nt.toFixed(2));
+  syncSliders();render();
+},{passive:true});
+wrap.addEventListener('touchend',()=>dragging=false);
+
+window.addEventListener('resize',()=>render());
+
+syncSliders();render();
+</script>
+</body>
+</html>
